@@ -2,22 +2,11 @@ import numpy as np
 import torch, math
 from tqdm import tqdm
 
+
 def calc_ctf_torch(freq2_2d, amp, phase, b_factor):
     env = torch.exp(- b_factor * freq2_2d * 0.5)
     ctf = amp * torch.cos(phase * freq2_2d * 0.5) - torch.sqrt(1 - amp**2) * torch.sin(phase * freq2_2d * 0.5) + torch.zeros_like(freq2_2d) * 1j
     return ctf * env 
-
-# def add_noise_torch(img, snr):
-#     std_image = torch.std(img)
-#     mask = torch.abs(img) > 0.5 * std_image
-#     signal_mean = torch.mean(img[mask])
-#     signal_std = torch.std(img[mask])
-#     noise_std = signal_std / math.sqrt(snr)
-#     noise = torch.normal(signal_mean, noise_std, size=img.shape, device="cuda")
-#     img_noise = img + noise
-#     img_noise -= torch.mean(img_noise)
-#     img_noise /= torch.std(img_noise)
-#     return img_noise
 
 
 def gen_grid(n_pixels, pixel_size):
@@ -87,33 +76,6 @@ def gen_img_torch_batch(coord, grid, sigma, norm, ctf=None):
     else:
         return image
 
-# def add_noise_torch_batch(img, snr):
-#     std_image = torch.std(img, dim=(1,2))
-#     mask = torch.abs(img) > 0.5 * std_image.view(-1,1,1)
-#     mask_count = torch.sum(mask, dim=(1,2))
-#     signal_mean = torch.sum(img*mask, dim=(1,2))/mask_count
-#     signal_std = torch.std(img*mask, dim=(1,2))
-#     noise_std = signal_std / math.sqrt(snr)
-#     noise = torch.distributions.normal.Normal(signal_mean, noise_std).sample(img[0].shape).permute(2,0,1)
-#     img_noise = img + noise
-#     img_noise -= torch.mean(img_noise, dim=(1,2)).view(-1,1,1)
-#     img_noise /= torch.std(img_noise, dim=(1,2)).view(-1,1,1)
-#     return img_noise
-
-# def add_noise_torch_batch(img, snr):
-#     num_images = img.shape[0]
-#     centered_images = img - img.mean(dim=(1,2)).view(-1,1,1)
-#     std_images = centered_images.std(dim=(1,2)) # std of image intensity
-#     noise_stds = torch.empty(num_images)
-#     for i in range(num_images):
-#         mask = torch.abs(centered_images[i]).ge(0.5*std_images[i])  # mask image with intensity > 0.5*std
-#         masked_image = torch.masked_select(centered_images[i], mask) # mask image with intensity > 0.5*std
-#         signal_std = torch.std(masked_image) # std pixel intensity (sigma_signal)
-#         noise_stds[i] = signal_std / math.sqrt(snr)
-#     noise = torch.distributions.normal.Normal(0, noise_stds).sample(img[0].shape).permute(2,0,1).cuda()
-#     img_noise = img + noise
-#     img_noise = img_noise - img_noise.mean(dim=(1,2)).view(-1,1,1)
-#     return img_noise
 
 def circular_mask(n_pixels, radius):
     grid = torch.linspace(-.5*(n_pixels-1), .5*(n_pixels-1), n_pixels)
