@@ -6,21 +6,31 @@ import os
 import MDAnalysis as mda
 import sys
 
-uImg = mda.Universe(
-    "/mnt/home/wtang/ceph/desres_data/DESRES-Trajectory_CLN025-0-protein/CLN025-0-protein.pdb",
-    "trj/rmsfit_md_run_desres_skip5.xtc")
+
+
 
 directory = "/mnt/home/wtang/ceph/cryo_ensemble_refinement/data/desres"
 snrlabels = [
     "nonoise",
-    "snr1",
-    "snr01",
-    "snr001",
-    "snr0001",
-    "snr00001",
-    "snr000001",
-    "snr0000001",
+    "snr0",  ## SNR = 1e-0
+    "snr1",  ## SNR = 1e-1
+    "snr2",
+    "snr3",
+    "snr4",
+    "snr5",
+    "snr6",
     "snr7",
+]
+snrs = [
+    np.infty,
+    1,
+    0.1,
+    1e-2,
+    1e-3,
+    1e-4,
+    1e-5,
+    1e-6,
+    1e-7,
 ]
 
 n_clusters = int(sys.argv[1])
@@ -43,14 +53,30 @@ def mdau_to_pos_arr(u, frames=None):
 
 print("Reading trajectory...")
 
-coord = torch.from_numpy(np.load("/mnt/home/wtang/Code/gmm_clustering/output/gmm_centers_%d.npy"%n_clusters).astype(float))
-coord -= coord.mean(1).unsqueeze(1)
+## Reading image trajectory
+uImg = mda.Universe(
+    "/mnt/home/wtang/ceph/desres_data/DESRES-Trajectory_CLN025-0-protein/CLN025-0-protein.pdb",
+    "trj/rmsfit_md_run_desres_skip5.xtc")
+coord_img = mdau_to_pos_arr(uImg)
+
+## Using K-medoids centers
+M = 20
+uStr = mda.Universe("/mnt/home/wtang/ceph/test_MD/chignolin/gromacs_2022/data/gro/md_run_pbc_center.gro",
+    "/mnt/home/wtang/ceph/test_MD/chignolin/replicas/data/xtc/rmsfit_md_run_all_pbc_center_skip10.xtc")
+frames = np.loadtxt("km_medoids_120k_%d.txt"%M).astype(int)
+coord = mdau_to_pos_arr(uStr, frames)
+rot_mats_align = torch.from_numpy(np.load("rot_mats_120kkm%d_desres.npy"%M))
+
+## Using GMM centers
+# coord = torch.from_numpy(np.load("/mnt/home/wtang/Code/gmm_clustering/output/gmm_centers_%d.npy"%n_clusters).astype(float))
+# coord -= coord.mean(1).unsqueeze(1)
+# rot_mats_align = torch.from_numpy(np.load("rot_mats_120kgmm%d_desres.npy"%n_clusters))
+
 n_struc = coord.shape[0]
 
 n_batch = 10
-rot_mats_align = torch.from_numpy(np.load("rot_mats_120kgmm%d_desres.npy"%n_clusters))
 
-for snrlabel in snrlabels:
+for snr, snrlabel in zip(snrs, snrlabels):
 
     file_prefix = "npix256_ps015_s15_%s_skip5_n1"%snrlabel
     batch_start = 0
@@ -62,27 +88,28 @@ for snrlabel in snrlabels:
 
     print(file_prefix)
 
-    for i_batch in range(n_batch): 
-        # print("Batch %d"%i_batch)
-        # pos_batch = pos[i_batch*batch_size:(i_batch+1)*batch_size].cuda()
-        # rot_mats, ctfs, images = igt.generate_images(
-        #         pos_batch,
-        #         num_images_per_struc = 1,
-        #         n_pixels = 256,  ## use power of 2 for CTF purpose
-        #         pixel_size = 0.15,
-        #         sigma = 1.5,
-        #         snr = snr,
-        #         ctf = True,
-        #         batch_size = 20,
-        #     )
+    for i_batch in range(n_batch):
+
+        print("Batch %d"%i_batch)
+        pos_batch = coord_img[i_batch*batch_size:(i_batch+1)*batch_size].cuda()
+        rot_mats, ctfs, images = igt.generate_images(
+                pos_batch,
+                num_images_per_struc = 1,
+                n_pixels = 256,  ## use power of 2 for CTF purpose
+                pixel_size = 0.15,
+                sigma = 1.5,
+                snr = snr,
+                ctf = True,
+                batch_size = 20,
+            )
 
         # np.save('%s/rot_mats_%s_batch%d.npy'%(directory, file_prefix, i_batch), rot_mats)
         # np.save('%s/ctf_%s_batch%d.npy'%(directory, file_prefix, i_batch), ctfs)
         # np.save('%s/images_%s_batch%d.npy'%(directory, file_prefix, i_batch), images)
 
-        # np.save('/mnt/home/wtang/ceph/cryo_ensemble_refinement/data/desres/rot_mats_npix256_ps015_s15_snr10_skip5_n1_batch%d.npy'%i, rot_mats)
-        # np.save('/mnt/home/wtang/ceph/cryo_ensemble_refinement/data/desres/ctf_npix256_ps015_s15_snr10_skip5_n1_batch%d.npy'%i, ctfs)
-        # np.save('/mnt/home/wtang/ceph/cryo_ensemble_refinement/data/desres/images_npix256_ps015_s15_snr10_skip5_n1_batch%d.npy'%i, images)
+        np.save('/mnt/home/wtang/ceph/cryo_ensemble_refinement/data/desres/rot_mats_npix256_ps015_s15_snr10_skip5_n1_batch%d.npy'%i, rot_mats)
+        np.save('/mnt/home/wtang/ceph/cryo_ensemble_refinement/data/desres/ctf_npix256_ps015_s15_snr10_skip5_n1_batch%d.npy'%i, ctfs)
+        np.save('/mnt/home/wtang/ceph/cryo_ensemble_refinement/data/desres/images_npix256_ps015_s15_snr10_skip5_n1_batch%d.npy'%i, images)
 
         print("Batch %d..."%i_batch)
 
