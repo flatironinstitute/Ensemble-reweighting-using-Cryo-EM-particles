@@ -2,11 +2,22 @@ import numpy as np
 import torch, math
 from tqdm import tqdm
 
-
 def calc_ctf_torch(freq2_2d, amp, phase, b_factor):
     env = torch.exp(- b_factor * freq2_2d * 0.5)
     ctf = amp * torch.cos(phase * freq2_2d * 0.5) - torch.sqrt(1 - amp**2) * torch.sin(phase * freq2_2d * 0.5) + torch.zeros_like(freq2_2d) * 1j
     return ctf * env 
+
+# def add_noise_torch(img, snr):
+#     std_image = torch.std(img)
+#     mask = torch.abs(img) > 0.5 * std_image
+#     signal_mean = torch.mean(img[mask])
+#     signal_std = torch.std(img[mask])
+#     noise_std = signal_std / math.sqrt(snr)
+#     noise = torch.normal(signal_mean, noise_std, size=img.shape, device="cuda")
+#     img_noise = img + noise
+#     img_noise -= torch.mean(img_noise)
+#     img_noise /= torch.std(img_noise)
+#     return img_noise
 
 
 def gen_grid(n_pixels, pixel_size):
@@ -58,8 +69,10 @@ def quaternion_to_matrix(quaternions):
 
 
 def calc_ctf_torch_batch(freq2_2d, amp, phase, b_factor):
-    env = torch.exp(- b_factor.view(-1,1,1) * freq2_2d.unsqueeze(0) * 0.5)
-    ctf = amp.view(-1,1,1) * torch.cos(phase.view(-1,1,1) * freq2_2d * 0.5) - torch.sqrt(1 - amp.view(-1,1,1) **2) * torch.sin(phase.view(-1,1,1)  * freq2_2d * 0.5) + torch.zeros_like(freq2_2d) * 1j
+    # env = torch.exp(- b_factor.view(-1,1,1) * freq2_2d.unsqueeze(0) * 0.5)
+    # ctf = amp.view(-1,1,1) * torch.cos(phase.view(-1,1,1) * freq2_2d * 0.5) - torch.sqrt(1 - amp.view(-1,1,1) **2) * torch.sin(phase.view(-1,1,1)  * freq2_2d * 0.5) + torch.zeros_like(freq2_2d) * 1j
+    env = torch.exp(- b_factor * freq2_2d.unsqueeze(0) * 0.5)
+    ctf = amp * torch.cos(phase.view(-1,1,1) * freq2_2d * 0.5) - np.sqrt(1 - amp**2) * torch.sin(phase.view(-1,1,1)  * freq2_2d * 0.5) + torch.zeros_like(freq2_2d) * 1j
     ctf *= env
     return ctf
 
@@ -76,6 +89,33 @@ def gen_img_torch_batch(coord, grid, sigma, norm, ctf=None):
     else:
         return image
 
+# def add_noise_torch_batch(img, snr):
+#     std_image = torch.std(img, dim=(1,2))
+#     mask = torch.abs(img) > 0.5 * std_image.view(-1,1,1)
+#     mask_count = torch.sum(mask, dim=(1,2))
+#     signal_mean = torch.sum(img*mask, dim=(1,2))/mask_count
+#     signal_std = torch.std(img*mask, dim=(1,2))
+#     noise_std = signal_std / math.sqrt(snr)
+#     noise = torch.distributions.normal.Normal(signal_mean, noise_std).sample(img[0].shape).permute(2,0,1)
+#     img_noise = img + noise
+#     img_noise -= torch.mean(img_noise, dim=(1,2)).view(-1,1,1)
+#     img_noise /= torch.std(img_noise, dim=(1,2)).view(-1,1,1)
+#     return img_noise
+
+# def add_noise_torch_batch(img, snr):
+#     num_images = img.shape[0]
+#     centered_images = img - img.mean(dim=(1,2)).view(-1,1,1)
+#     std_images = centered_images.std(dim=(1,2)) # std of image intensity
+#     noise_stds = torch.empty(num_images)
+#     for i in range(num_images):
+#         mask = torch.abs(centered_images[i]).ge(0.5*std_images[i])  # mask image with intensity > 0.5*std
+#         masked_image = torch.masked_select(centered_images[i], mask) # mask image with intensity > 0.5*std
+#         signal_std = torch.std(masked_image) # std pixel intensity (sigma_signal)
+#         noise_stds[i] = signal_std / math.sqrt(snr)
+#     noise = torch.distributions.normal.Normal(0, noise_stds).sample(img[0].shape).permute(2,0,1).cuda()
+#     img_noise = img + noise
+#     img_noise = img_noise - img_noise.mean(dim=(1,2)).view(-1,1,1)
+#     return img_noise
 
 def circular_mask(n_pixels, radius):
     grid = torch.linspace(-.5*(n_pixels-1), .5*(n_pixels-1), n_pixels)
@@ -128,17 +168,21 @@ def generate_images(
     else:
         rot_mats = quaternion_to_matrix(quats).type(torch.float64)
     coord_rot = coord.matmul(rot_mats)
-    grid = gen_grid(n_pixels, pixel_size).reshape(-1,1)
+    grid = gen_grid(n_pixels, pixel_size).reshape(-1,1).cuda()
 
     ctfs_cpu = torch.empty((num_images, n_pixels, n_pixels), dtype=torch.complex64, device='cpu')
     images_cpu = torch.empty((num_images, n_pixels, n_pixels), dtype=torch.float64, device='cpu')
 
     if ctf:
-        b_factor = torch.rand(num_images, dtype=torch.float64, device=device)
-        defocus = torch.rand(num_images, dtype=torch.float64, device=device) * (3.0 - 0.9) + 0.9
-        amp = torch.rand(num_images, dtype=torch.float64, device=device)
+        # amp = torch.rand(num_images, dtype=torch.float64, device=device)
+        # b_factor = torch.rand(num_images, dtype=torch.float64, device=device)
+        amp = 0.1
+        b_factor = 1.0
+        # defocus = torch.rand(num_images, dtype=torch.float64, device=device) * (3.0 - 0.9) + 0.9
+        defocus = torch.rand(num_images, dtype=torch.float64, device=device) * (0.090 - 0.027) + 0.027
+        
         elecwavel = 0.019866
-        phase  = defocus * (np.pi * 2. * 300 * elecwavel)
+        phase  = defocus * (np.pi * 2. * 10000 * elecwavel)
 
         freq_pix_1d = torch.fft.fftfreq(n_pixels, d=pixel_size, dtype=torch.float64, device=device)
         freq_x, freq_y = torch.meshgrid(freq_pix_1d, freq_pix_1d, indexing='ij')
@@ -158,7 +202,8 @@ def generate_images(
             else:
                 coords_batch = coord_rot[start:end]
         if ctf:
-            ctf_batch = calc_ctf_torch_batch(freq2_2d, amp[start:end], phase[start:end], b_factor[start:end])
+            # ctf_batch = calc_ctf_torch_batch(freq2_2d, amp[start:end], phase[start:end], b_factor[start:end])
+            ctf_batch = calc_ctf_torch_batch(freq2_2d, amp, phase[start:end], b_factor)
             ctfs_cpu[start:end] = ctf_batch
             image_batch = gen_img_torch_batch(coords_batch, grid, sigma, norm, ctf_batch)
         else:
