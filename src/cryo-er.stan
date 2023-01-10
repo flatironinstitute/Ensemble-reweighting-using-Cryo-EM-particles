@@ -1,9 +1,6 @@
 functions {
   real log_likelihood(array[,] real D_slice, int start, int end, vector normed_log_weights_logNm) {
     real total = 0;
-    // for (d in D_slice) {
-    //   total += log_sum_exp(to_vector(d) + normed_log_weights_logNm);
-    // }
     for (i in 1:end-start+1) { // for each row (each image) in a slice of D
       total += log_sum_exp(to_vector(D_slice[i]) + normed_log_weights_logNm); // log sum exp over centers M, add to log_posterior
     }
