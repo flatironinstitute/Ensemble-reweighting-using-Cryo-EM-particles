@@ -2,40 +2,30 @@ import numpy as np
 from tqdm import tqdm 
 import torch
 import imggen_torch as igt
-import os
+import os, sys
 import MDAnalysis as mda
-import sys
 
 
-
-
-directory = "/mnt/home/wtang/ceph/cryo_ensemble_refinement/data/desres"
-snrlabels = [
-    "nonoise",
-    "snr0",  ## SNR = 1e-0
-    "snr1",  ## SNR = 1e-1
-    "snr2",
+N_center = 20 ## Number of centers, i.e., representative configuration from MD
+filelabels = [
+    "nonoise", ## Image with no noise added
+    "snr0", ## Image with noise added, with SNR = 1e0 = 1
+    "snr1", ## SNR = 1e-1 = 0.1
+    "snr2", ##  ...
     "snr3",
     "snr4",
-    "snr5",
-    "snr6",
-    "snr7",
 ]
 snrs = [
-    np.infty,
-    1,
-    0.1,
-    1e-2,
+    np.infty, ## Image with no noise added
+    1, ## Image with noise added, with SNR = 1e0 = 1
+    0.1, ## SNR = 1e-1 = 0.1
+    1e-2, ##  ...
     1e-3,
     1e-4,
-    1e-5,
-    1e-6,
-    1e-7,
 ]
 
-n_clusters = int(sys.argv[1])
-
-dataset = "replicagmm%dtodesres"%n_clusters
+directory = "/mnt/home/wtang/ceph/cryo_ensemble_refinement/data/desres"
+dataset = "replicakm%dtodesres"%N_center
 
 def mdau_to_pos_arr(u, frames=None):
     protein_CA = u.select_atoms("protein and name CA")
@@ -68,25 +58,23 @@ coord = mdau_to_pos_arr(uStr, frames)
 rot_mats_align = torch.from_numpy(np.load("rot_mats_120kkm%d_desres.npy"%M))
 
 ## Using GMM centers
-# coord = torch.from_numpy(np.load("/mnt/home/wtang/Code/gmm_clustering/output/gmm_centers_%d.npy"%n_clusters).astype(float))
+# coord = torch.from_numpy(np.load("/mnt/home/wtang/Code/gmm_clustering/output/gmm_centers_%d.npy"%N_center).astype(float))
 # coord -= coord.mean(1).unsqueeze(1)
-# rot_mats_align = torch.from_numpy(np.load("rot_mats_120kgmm%d_desres.npy"%n_clusters))
+# rot_mats_align = torch.from_numpy(np.load("rot_mats_120kgmm%d_desres.npy"%N_center))
 
 n_struc = coord.shape[0]
 
-n_batch = 10
+n_batch = 10 ## Seperate into batch for memory management for GPU calculation
 
-for snr, snrlabel in zip(snrs, snrlabels):
+for snr, snrlabel in zip(snrs, filelabels):
 
     file_prefix = "npix256_ps015_s15_%s_skip5_n1"%snrlabel
     batch_start = 0
     n_batch = 10
-    n_frame = len(uImg.trajectory) # pos.shape[0]
+    n_frame = len(uImg.trajectory)
     batch_size = int(n_frame/n_batch)
     while batch_size*n_batch < n_frame:
         batch_size += 1
-
-    print(file_prefix)
 
     for i_batch in range(n_batch):
 
@@ -102,14 +90,10 @@ for snr, snrlabel in zip(snrs, snrlabels):
                 ctf = True,
                 batch_size = 20,
             )
-
-        # np.save('%s/rot_mats_%s_batch%d.npy'%(directory, file_prefix, i_batch), rot_mats)
-        # np.save('%s/ctf_%s_batch%d.npy'%(directory, file_prefix, i_batch), ctfs)
-        # np.save('%s/images_%s_batch%d.npy'%(directory, file_prefix, i_batch), images)
-
-        np.save('/mnt/home/wtang/ceph/cryo_ensemble_refinement/data/desres/rot_mats_npix256_ps015_s15_snr10_skip5_n1_batch%d.npy'%i, rot_mats)
-        np.save('/mnt/home/wtang/ceph/cryo_ensemble_refinement/data/desres/ctf_npix256_ps015_s15_snr10_skip5_n1_batch%d.npy'%i, ctfs)
-        np.save('/mnt/home/wtang/ceph/cryo_ensemble_refinement/data/desres/images_npix256_ps015_s15_snr10_skip5_n1_batch%d.npy'%i, images)
+        
+        np.save('/mnt/home/wtang/ceph/cryo_ensemble_refinement/data/desres/rot_mats_%s_batch%d.npy'%(file_prefix,i_batch), rot_mats)
+        np.save('/mnt/home/wtang/ceph/cryo_ensemble_refinement/data/desres/ctf_%s_batch%d.npy'%(file_prefix,i_batch), ctfs)
+        np.save('/mnt/home/wtang/ceph/cryo_ensemble_refinement/data/desres/images_%s_batch%d.npy'%(file_prefix,i_batch), images)
 
         print("Batch %d..."%i_batch)
 
