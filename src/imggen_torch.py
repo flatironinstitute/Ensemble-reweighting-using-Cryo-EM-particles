@@ -3,19 +3,19 @@ import torch, math
 from tqdm import tqdm
 
 
-def gen_grid(n_pixels, pixel_size):
+def gen_grid(n_pixel, pixel_size):
     ## 
     ## gen_grid : function : generate square grids of positions of each pixel
     ## 
     ## Input:
-    ##     n_pixels : int : number of pixels of image i.e. the synthetic (cryo-EM) images are of shape (n_pixels, n_pixels)
+    ##     n_pixel : int : number of pixels of image i.e. the synthetic (cryo-EM) images are of shape (n_pixel, n_pixel)
     ##     pixel_size : float : width of each pixel in physical space in Angstrom
     ## Output:
     ##     grid : torch tensor of float of shape (N_pixel) : physical location of center of each pixel (in Angstrom)
     ## 
-    grid_min = -pixel_size*(n_pixels-1)*0.5
-    grid_max = -grid_min #pixel_size*(n_pixels-1)*0.5
-    grid = torch.linspace(grid_min, grid_max, n_pixels)
+    grid_min = -pixel_size*(n_pixel-1)*0.5
+    grid_max = -grid_min #pixel_size*(n_pixel-1)*0.5
+    grid = torch.linspace(grid_min, grid_max, n_pixel)
     return grid
 
 def gen_quat_torch(num_quaternions, device = "cuda"):
@@ -111,17 +111,17 @@ def gen_img_torch_batch(coord, grid, sigma, norm, ctfs=None):
         return image
 
 
-def circular_mask(n_pixels, radius=0.4):
+def circular_mask(n_pixel, radius=0.4):
     ## 
     ## circular_mask : function : define a circular mask centered at center of the image for SNR calculation purpose (see Method for detail)
     ## 
     ## Input :
-    ##     n_pixels : int : number of pixels of image i.e. the synthetic (cryo-EM) images are of shape (n_pixels, n_pixels)
-    ##     radius : float : radius of the circular mask relative to n_pixels, when radius = 0.5, the circular touches the edges of the image
+    ##     n_pixel : int : number of pixels of image i.e. the synthetic (cryo-EM) images are of shape (n_pixel, n_pixel)
+    ##     radius : float : radius of the circular mask relative to n_pixel, when radius = 0.5, the circular touches the edges of the image
     ## Output :
     ##     mask : torch tensor of bool of shape (N_pixel, N_pixel) : circular mask to be applied onto the image
     ## 
-    grid = torch.linspace(-.5*(n_pixels-1), .5*(n_pixels-1), n_pixels)
+    grid = torch.linspace(-.5*(n_pixel-1), .5*(n_pixel-1), n_pixel)
     grid_x, grid_y = torch.meshgrid(grid, grid, indexing='ij')
     r_2d = grid_x**2 + grid_y**2
     mask = r_2d < radius**2
@@ -133,14 +133,14 @@ def add_noise_torch_batch(img, snr, device = "cuda"):
     ## add_noise_torch_batch : function : add colorless Gaussian pixel noise to images
     ## 
     ## Input :
-    ##     n_pixels : int : number of pixels of image i.e. the synthetic (cryo-EM) images are of shape (n_pixels, n_pixels)
+    ##     n_pixel : int : number of pixels of image i.e. the synthetic (cryo-EM) images are of shape (n_pixel, n_pixel)
     ##     snr : float : Signal-to-noise (SNR) for adding noise to the image, if snr = np.infty, does not add noise to the images
     ## Output :
     ##     image_noise : torch tensor of float of shape (N_image, N_pixel, N_pixel) : synthetic images with added noise
     ## 
-    n_pixels = img.shape[1]
-    radius = n_pixels*0.4
-    mask = circular_mask(n_pixels, radius)
+    n_pixel = img.shape[1]
+    radius = n_pixel*0.4
+    mask = circular_mask(n_pixel, radius)
     image_noise = torch.empty_like(img, device=device)
     for i, image in enumerate(img):
         image_masked = image[mask]
@@ -153,8 +153,7 @@ def add_noise_torch_batch(img, snr, device = "cuda"):
 
 def generate_images(
         coord, 
-        N_images_per_struc = 1, 
-        n_pixels = 128,  ## use power of 2 for CTF purpose
+        n_pixel = 128,  ## use power of 2 for CTF purpose
         pixel_size = 0.3,
         sigma = 1.0, 
         snr = 1.0,
@@ -168,8 +167,7 @@ def generate_images(
     ## 
     ## Input :
     ##     coord : numpy ndarray or torch tensor of float of shape (N_image, N_atom, 3) : 3D Cartesian coordinates of atoms of configuration aligned to generate the synthetic images
-    ##     N_images_per_struc : int : number of images to be generate for each structure provided
-    ##     n_pixels : int : number of pixels of image i.e. the synthetic (cryo-EM) images are of shape (n_pixels, n_pixels)
+    ##     n_pixel : int : number of pixels of image i.e. the synthetic (cryo-EM) images are of shape (n_pixel, n_pixel)
     ##     pixel_size : float : width of each pixel in physical space in Angstrom
     ##     sigma : float : Gaussian width of each atom in the imaging model in Angstrom
     ##     snr : float : Signal-to-noise (SNR) for adding noise to the image, if snr = np.infty, does not add noise to the images
@@ -177,35 +175,36 @@ def generate_images(
     ##     batch_size : int : to split the set of images into batches for calculation, where structure in the same batch are fed into calculation at the same time, a parameter for computational performance / memory management
     ##     device : str : "cuda" or "cpu", to be fed into pyTorch, see pyTorch manual for more detail
     ## Output :
-    ##     rot_mats.cpu() : torch tensor of float of shape (N_image, 3, 3) : Rotational matrices randomly generated to orient the configraution during the image generation process
+    ##     rot_mats : torch tensor of float of shape (N_image, 3, 3) : Rotational matrices randomly generated to orient the configraution during the image generation process
     ##     ctfs_cpu : torch tensor of float of shape (N_image, N_pixel, N_pixel) : random generated CTF added to each of the synthetic image
     ##     images_cpu : torch tensor of float of shape (N_image, N_pixel, N_pixel) : generated synthetic images
     ## 
 
 
     if type(coord) == np.ndarray:
-        coord = torch.from_numpy(coord).type(torch.float64).cuda()
-    if coord.device == "cpu":
+        coord = torch.from_numpy(coord).type(torch.float64)
+    if device == "cuda":
         coord = coord.cuda()
 
     n_struc = coord.shape[0]
     n_atoms = coord.shape[1]
     norm = .5/(np.pi*sigma**2*n_atoms)
-    N_images = N_images_per_struc * n_struc
+    N_images = n_struc
     n_batch = int(N_images / batch_size)
     if n_batch * batch_size < N_images:
         n_batch += 1
 
     quats = gen_quat_torch(N_images, device)
+    rot_mats = quaternion_to_matrix(quats).type(torch.float64)
     if device == "cuda":
-        rot_mats = quaternion_to_matrix(quats).type(torch.float64).cuda()
-    else:
-        rot_mats = quaternion_to_matrix(quats).type(torch.float64)
+        rot_mats = rot_mats.cuda()
     coord_rot = coord.matmul(rot_mats)
-    grid = gen_grid(n_pixels, pixel_size).reshape(-1,1).cuda()
+    grid = gen_grid(n_pixel, pixel_size).reshape(-1,1)
+    if device == "cuda":
+        grid = grid.cuda()
 
-    ctfs_cpu = torch.empty((N_images, n_pixels, n_pixels), dtype=torch.complex64, device='cpu')
-    images_cpu = torch.empty((N_images, n_pixels, n_pixels), dtype=torch.float64, device='cpu')
+    ctfs_cpu = torch.empty((N_images, n_pixel, n_pixel), dtype=torch.complex64, device='cpu')
+    images_cpu = torch.empty((N_images, n_pixel, n_pixel), dtype=torch.float64, device='cpu')
 
     if add_ctf:
         amp = 0.1  ## Amplitude constrast ratio 
@@ -215,23 +214,16 @@ def generate_images(
         elecwavel = 0.019866  ## electron wavelength in Angstrom
         gamma = defocus * (np.pi * 2. * 10000 * elecwavel) ## gamma coefficient in SI equation 4 that include the defocus
 
-        freq_pix_1d = torch.fft.fftfreq(n_pixels, d=pixel_size, dtype=torch.float64, device=device)
+        freq_pix_1d = torch.fft.fftfreq(n_pixel, d=pixel_size, dtype=torch.float64, device=device)
         freq_x, freq_y = torch.meshgrid(freq_pix_1d, freq_pix_1d, indexing='ij')
         freq2_2d = freq_x**2 + freq_y**2  ## square of modulus of spatial frequency
     
     for i in tqdm(range(n_batch)):
         start = i*batch_size
         end = (i+1)*batch_size
-        if N_images_per_struc > 1:
-            if device == "cuda":
-                coords_batch = coord_rot[int(start/N_images_per_struc):int(end/N_images_per_struc)].cuda()
-            else:
-                coords_batch = coord_rot[int(start/N_images_per_struc):int(end/N_images_per_struc)]
-        else:
-            if device == "cuda":
-                coords_batch = coord_rot[start:end].cuda()
-            else:
-                coords_batch = coord_rot[start:end]
+        coords_batch = coord_rot[start:end]
+        if device == "cuda":
+            coords_batch = coords_batch.cuda()
         if add_ctf:
             ctf_batch = calc_ctf_torch_batch(freq2_2d, amp, gamma[start:end], b_factor)
             ctfs_cpu[start:end] = ctf_batch
@@ -242,12 +234,14 @@ def generate_images(
             image_batch = add_noise_torch_batch(image_batch, snr, device)
         images_cpu[start:end] = image_batch.cpu()
 
-    return rot_mats.cpu(), ctfs_cpu, images_cpu
+    if device == "cuda":
+        rot_mats = rot_mats.cpu()
+    return rot_mats, ctfs_cpu, images_cpu
 
 
 def calc_struc_image_diff(
         coord, 
-        n_pixels = 128,  ## use power of 2 for CTF purpose
+        n_pixel = 128,  ## use power of 2 for CTF purpose
         pixel_size = 0.3,
         sigma = 1.0, 
         images = None,
@@ -261,7 +255,7 @@ def calc_struc_image_diff(
     ## Input :
     ##     coord : numpy ndarray or torch tensor of float of shape (N_image, N_atom, 3) : 3D Cartesian coordinates of atoms of configuration aligned to each of the N_image synthetic images
     ##                 these N_image coordinates represent ONE single configuration that is rotated by N_image different rotation matrices to align the configuration to N_image different images
-    ##     n_pixels : int : number of pixels of image i.e. the synthetic (cryo-EM) images are of shape (n_pixels, n_pixels)
+    ##     n_pixel : int : number of pixels of image i.e. the synthetic (cryo-EM) images are of shape (n_pixel, n_pixel)
     ##     pixel_size : float : width of each pixel in physical space in Angstrom
     ##     sigma : float : Gaussian width of each atom in the imaging model in Angstrom
     ##     images : torch tensor of float of shape (N_image, N_pixel, N_pixel) : Intensity of cryo-EM (synthetic) images to be compared to the structure
@@ -273,10 +267,9 @@ def calc_struc_image_diff(
     ## 
 
     if type(coord) == np.ndarray:
+        coord = torch.from_numpy(coord).type(torch.float64)
         if device == "cuda":
-            coord = torch.from_numpy(coord).type(torch.float64).cuda()
-        else:
-            coord = torch.from_numpy(coord).type(torch.float64)
+            coord = coord.cuda()
 
     n_atoms = coord.shape[1]
     norm = .5/(np.pi*sigma**2*n_atoms)
@@ -285,7 +278,7 @@ def calc_struc_image_diff(
     if n_batch * batch_size < N_images:
         n_batch += 1
 
-    grid = gen_grid(n_pixels, pixel_size).reshape(-1,1)
+    grid = gen_grid(n_pixel, pixel_size).reshape(-1,1)
     if device == "cuda":
         grid = grid.cuda()
 
@@ -295,10 +288,9 @@ def calc_struc_image_diff(
         start = i*batch_size
         end = (i+1)*batch_size
         if ctfs is not None:
+            ctf_batch = ctfs[start:end]
             if device == "cuda":
-                ctf_batch = ctfs[start:end].cuda()
-            else:
-                ctf_batch = ctfs[start:end]
+                ctf_batch = ctf_batch.cuda()
             image_batch = gen_img_torch_batch(coord[start:end], grid, sigma, norm, ctf_batch)
         else:
             image_batch = gen_img_torch_batch(coord[start:end], grid, sigma, norm)
