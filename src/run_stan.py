@@ -18,12 +18,10 @@ parser.add_argument('-l', '--lmbd', type=float, default=1e-6,
     help="standard deviation of colorless pixel noise in cryo-EM images")
 parser.add_argument('-fc', '--infileclustersize', default="cluster_size.txt", 
     help="file containing the number of conformations in each cluster")
-parser.add_argument('-fd', '--infileimagedistance', type=argparse.FileType('r'), nargs='+'
+parser.add_argument('-fd', '--infileimagedistance', nargs='+', default=[],
     help="(list of) file(s) containing the matrix of size M times N of pairwise distance between M structures and N images")
 parser.add_argument('-o', '--outdir', default="./output/",
     help="directory for output files")
-parser.add_argument('-nc', '--chains', type=int, default=1,
-    help="number of MCMC chains for posterior sampling")
 parser.add_argument('-nc', '--chains', type=int, default=1,
     help="number of MCMC chains for posterior sampling")
 parser.add_argument('-sf', '--sigfig', type=int, default=6,
@@ -58,13 +56,12 @@ log_Nm = np.log(counts)
 ## Read distance matrix between cryoEM images and MD structures
 distance = None
 for f in args.infileimagedistance:
-    for line in f:
-        print(line)
-        # if distance is None:
-        #     distance = np.load(line)
-        # else:
-        #     data = np.load(line)
-        #     distance = np.hstack((distance,data))
+    if distance is None:
+        distance = np.load(f)
+    else:
+        data = np.load(f)
+        distance = np.hstack((distance,data))
+
 ## Write json files for reading into Stan program
 M = distance.shape[0]
 N = distance.shape[1]
@@ -119,4 +116,5 @@ fit = my_model.sample(data=data_file,
 
 ## Save Stan output, i.e., posterior samples, in CSV format, in a specified folder
 fit.save_csvfiles(dir=stan_output_file)
+
 
