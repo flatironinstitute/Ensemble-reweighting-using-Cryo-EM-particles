@@ -1,9 +1,18 @@
 # Ensemble reweighting using Cryo-EM particles
 
-
-To generate the synthetic images and calculate the structure-images distanace matrix
+Installation
+-----------------
+To install, run 
 ```
-python3 calc_image_struc_distance.py \
+    pip install -e .
+```
+in this directory.
+
+Running the Code
+-----------------
+To generate the synthetic images and calculate the structure-images distance matrix
+```
+python3 -m cryoER.calc_image_struc_distance \
   --top_image ../data/image.pdb \
   --traj_image ../data/image.xtc \
   --top_struc ../data/struc.gro \
@@ -25,7 +34,7 @@ To use GPU acceleration, add the arguments
 
 To run the MCMC scripts
 ```
-python3 run_stan.py \
+python3 -m cryoER.run_cryoER_mcmc \
   --infileclustersize data/cluster_counts.txt \
   --infileimagedistance data/diff.npy \
   ---outdir output/ \
