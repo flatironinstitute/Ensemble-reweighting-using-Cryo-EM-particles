@@ -36,7 +36,6 @@ python3 run_stan.py \
 If there are more than one input file of structure-image distance matrix, replace the argument accordingly:
 ```
   --infileimagedistance data/diff0.npy data/diff1.npy data/diff2.npy \
-...
 ```
 For parallelization, for running 4 chains in parallel, 15 threads per chain in a multithread settings, add the arguments
 ```
