@@ -1,4 +1,4 @@
-# cryoER
+# Ensemble reweighting using Cryo-EM particles
 
 To run the MCMC scripts
 ```
