@@ -1,0 +1,10 @@
+include LICENSE.md
+include MANIFEST.in
+
+graft src
+graft tests
+include src/cryoER/*.stan
+exclude src/cryoER/cryo-er
+exclude src/cryoER/cryo-er.hpp
+prune tests/.pytest_cache/
+global-exclude *.py[cod] __pycache__/* *.so *.dylib
