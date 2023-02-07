@@ -37,14 +37,14 @@ To use GPU acceleration, add the arguments
 ```
   --device cuda
 ```
-The output is a file with the structure-image distance matrix. 
+The main output is a file with the structure-image distance matrix (```diff_npix128_ps0.20_s1.5_snr1.0E-02.npy``` for this particular example).
 
 To estimate the weights, run the MCMC script
 ```
 python3 -m cryoER.run_cryoER_mcmc \
-  --infileclustersize data/cluster_counts.txt \
-  --infileimagedistance data/diff.npy \
-  ---outdir output/ \
+  --infileclustersize ../data/cluster_counts.txt \
+  --infileimagedistance ../data/diff_npix128_ps0.20_s1.5_snr1.0E-02.npy \
+  --outdir output/ \
   --chains 4 \
   --iterwarmup 200 \
   --itersample 2000
