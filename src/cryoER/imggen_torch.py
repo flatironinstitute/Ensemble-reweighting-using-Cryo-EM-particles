@@ -38,15 +38,7 @@ def gen_quat_torch(num_quaternions, device = "cuda"):
 
 
 def quaternion_to_matrix(quaternions):
-    quaternions_numpy = None
-    if torch.is_tensor(quaternions):
-        if quaternions.device == "cpu":
-            quaternions_numpy = quaternions.numpy()
-        else:
-            quaternions_numpy = quaternions.cpu().numpy()
-    else:
-        quaternions_numpy = quaternions
-    rot_mats = R.from_quat(quaternions_numpy).as_matrix()
+    rot_mats = R.from_quat(quaternions).as_matrix()
     return torch.tensor(rot_mats, dtype=torch.float64)
 
 
