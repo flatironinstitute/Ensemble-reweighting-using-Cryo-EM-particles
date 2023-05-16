@@ -1,7 +1,6 @@
 import numpy as np
 import torch, math
 from tqdm import tqdm
-from scipy.spatial.transform import Rotation as R
 
 
 def gen_grid(n_pixel, pixel_size):
@@ -38,8 +37,32 @@ def gen_quat_torch(num_quaternions, device = "cuda"):
 
 
 def quaternion_to_matrix(quaternions):
-    rot_mats = R.from_quat(quaternions).as_matrix()
-    return torch.tensor(rot_mats, dtype=torch.float64)
+    ## 
+    ## quaternion_to_matrix : function : Convert rotations given as quaternions to rotation matrices
+    ## 
+    ## Input:
+    ##     quaternions: tensor of float shape (4) : quaternions leading with the real part
+    ## Output:
+    ##     rot_mat : tensor of shape (3, 3) : Rotation matrices
+    ## 
+    r, i, j, k = torch.unbind(quaternions, -1)
+    two_s = 2.0 / (quaternions * quaternions).sum(-1)
+    o = torch.stack(
+        (
+            1 - two_s * (j * j + k * k),
+            two_s * (i * j - k * r),
+            two_s * (i * k + j * r),
+            two_s * (i * j + k * r),
+            1 - two_s * (i * i + k * k),
+            two_s * (j * k - i * r),
+            two_s * (i * k - j * r),
+            two_s * (j * k + i * r),
+            1 - two_s * (i * i + j * j),
+        ),
+        -1,
+    )
+    rot_mat = o.reshape(quaternions.shape[:-1] + (3, 3))
+    return rot_mat
 
 
 def calc_ctf_torch_batch(freq2_2d, amp, gamma, b_factor):
