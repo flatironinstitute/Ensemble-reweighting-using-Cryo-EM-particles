@@ -1,6 +1,6 @@
 # Ensemble reweighting using Cryo-EM particles
 
-* Please cite: https://arxiv.org/abs/2212.05320
+* Please cite: https://pubs.acs.org/doi/abs/10.1021/acs.jpcb.3c01087
 * Authors: Wai Shing Tang, David Silva-Sánchez, Julian Giraldo-Barreto, Bob Carpenter, Sonya Hanson, Alex H. Barnett, Erik H. Thiede, Pilar Cossio
 
 ## Bayesian inference framework for reweighting conformational ensembles using cryo-EM particles
