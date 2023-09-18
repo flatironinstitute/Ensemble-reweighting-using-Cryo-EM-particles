@@ -6,14 +6,14 @@ from scipy.special import logsumexp
 
 N_center = 50
 filename_nm = 'Test_Sep2023/nm.txt'
-output_name = 'Test_NotUni'
+output_name = 'Test_LogLikeMat'
 output_directory = './output_%s/'%output_name
 stan_directory = output_directory + 'stan_output/'
 
 nm = np.loadtxt(filename_nm)
 log_weights = []
 lp = []
-files = sorted(os.listdir(stan_directory))[-8:]
+files = sorted(os.listdir(stan_directory))
 print(files)
 
 nm /= np.sum(nm)
@@ -43,7 +43,7 @@ am_std = am.std((0,1))
 
 am_mean_std = np.vstack((am_mean, am_std)).T
 
-np.savetxt(output_directory+"weights_am_LogLikeMat.txt", am_mean_std, fmt='%.6f')
+np.savetxt(output_directory+"weights_am.txt", am_mean_std, fmt='%.6f')
 
 log_amnm = log_weights_d + log_nm[None,None,:]
 log_amnm -= logsumexp(log_amnm, axis=2)[:,:,None]
@@ -54,5 +54,5 @@ amnm_std = amnm.std((0,1))
 
 amnm_mean_std = np.vstack((amnm_mean, amnm_std)).T
 
-np.savetxt(output_directory+"weights_amnm_LogLikeMat.txt", amnm_mean_std, fmt='%.6f')
+np.savetxt(output_directory+"weights_amnm.txt", amnm_mean_std, fmt='%.6f')
 
