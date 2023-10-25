@@ -99,3 +99,10 @@ ENV/
 # Compiled Stan files
 src/cryoER/cryo-er
 src/cryoER/cryo-er.hpp
+
+# data buffer files
+data/.*.lock
+data/.*.npz
+
+# output files from tutorial
+tutorial/output/
