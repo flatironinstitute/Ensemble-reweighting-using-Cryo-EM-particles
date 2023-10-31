@@ -26,7 +26,9 @@ def BuildCmdStanModel(stan_model_path: str = None, cpp_options: Dict[str, Any] =
     if stan_model_path is None:
         module_path = importlib.resources.files("cryoER")
         path = os.path.join(module_path, "cryo-er.stan")
-
+    else:
+        path = stan_model_path
+    
     my_model = CmdStanModel(
         stan_file=path,
         cpp_options=cpp_options,
@@ -59,8 +61,8 @@ def _parse_args():
     parser.add_argument(
         "-fd",
         "--infileimagedistance",
-        nargs="+",
         default=[],
+        action="append",
         help="(list of) file(s) containing the matrix of size M times N of pairwise distance between M structures and N images",
     )
     parser.add_argument(
@@ -112,24 +114,21 @@ def _parse_args():
     return parser
 
 
-def main(args=None):
-    ######## Input parameters ########
-
-    ######## ######## ######## ########
-    if args is None:
-        parser = _parse_args()
-        args = parser.parse_args()
-
-    lmbd = args.lmbd
-    chains = args.chains
-    sig_figs = args.sigfig
-    parallel_chains = args.parallelchain
-    threads_per_chain = args.threadsperchain
-    iter_warmup = args.iterwarmup
-    iter_sampling = args.itersample
+def run_cryoER_mcmc(
+    lmbd = 1e-6,
+    chains = 4,
+    sig_figs = 6,
+    parallel_chains = 4,
+    threads_per_chain = 8,
+    iter_warmup = 200,
+    iter_sampling = 2000,
+    infileclustersize = "cluster_size.txt",
+    infileimagedistance = [],
+    outdir = "./output/",
+):
 
     ## Read N_m, the number of conformations that are in the mth cluster
-    infileclustersize = args.infileclustersize
+    infileclustersize = infileclustersize
     counts = np.loadtxt(infileclustersize).astype(int)
     counts = counts.astype(float)
     counts /= np.sum(counts)
@@ -137,7 +136,7 @@ def main(args=None):
 
     ## Read distance matrix between cryoEM images and MD structures
     distance = None
-    for f in args.infileimagedistance:
+    for f in infileimagedistance:
         if distance is None:
             distance = np.load(f)
         else:
@@ -149,7 +148,6 @@ def main(args=None):
     N = distance.shape[1]
     print("Number of structures = %d, Number of images = %d." % (M, N))
 
-    outdir = args.outdir
     try:
         os.mkdir(outdir)
     except FileExistsError:
@@ -196,6 +194,36 @@ def main(args=None):
     # Save Stan output, i.e., posterior samples, in CSV format, in a specified folder
     fit.save_csvfiles(dir=stan_output_file)
 
+    print("Done!")
+
+    pass
+
 
 if __name__ == "__main__":
-    main()
+
+    parser = _parse_args()
+    args = parser.parse_args()
+
+    lmbd = args.lmbd
+    chains = args.chains
+    sig_figs = args.sigfig
+    parallel_chains = args.parallelchain
+    threads_per_chain = args.threadsperchain
+    iter_warmup = args.iterwarmup
+    iter_sampling = args.itersample
+    infileclustersize = args.infileclustersize
+    infileimagedistance = args.infileimagedistance
+    outdir = args.outdir
+
+    run_cryoER_mcmc(
+        lmbd = lmbd,
+        chains = chains,
+        sig_figs = sig_figs,
+        parallel_chains = parallel_chains,
+        threads_per_chain = threads_per_chain,
+        iter_warmup = iter_warmup,
+        iter_sampling = iter_sampling,
+        infileclustersize = infileclustersize,
+        infileimagedistance = infileimagedistance,
+        outdir = outdir,
+    )

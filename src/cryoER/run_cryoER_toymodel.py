@@ -18,13 +18,14 @@ my_model = CmdStanModel(stan_file=my_stanfile,
 print(my_model.exe_info())
 
 dataset = "toy_model"
-output_directory = "../output"
+output_directory = "output"
 filelabel = "sigma1"
 
-filename = "%s/dmat/Dmat_%s_%s.json"%(output_directory,dataset,filelabel)
-directory = "%s//Dmat_%s_%s"%(output_directory,dataset,filelabel)
+directory = "%s/Dmat_%s_%s"%(output_directory,dataset,filelabel)
+filename = "%s/Dmat_%s_%s/Dmat.json"%(output_directory,dataset,filelabel)
+
 try:
-    os.mkdir(directory)
+    os.makedirs(directory,exist_ok=True)
 except FileExistsError:
     pass
 
@@ -43,6 +44,8 @@ covariance = np.array([
 ])  # Width of the Gaussians
 data = np.array([])
 sizes = [5000, 3000, 2000]  # relative population of the 3 Gaussians in the data set
+log_sizes = np.log(sizes)
+#exit()
 for mean, size in zip(means, sizes):
     cluster = np.random.multivariate_normal(mean=mean,cov=covariance,size=size)
     if data.size: 
@@ -70,6 +73,7 @@ Dmat = -norm*distance
 dictionary = {
     "M": M,
     "N": N,
+    "logNm": [float(a) for a in log_sizes],
     "Dmat": [list(a) for a in Dmat]
 }
 

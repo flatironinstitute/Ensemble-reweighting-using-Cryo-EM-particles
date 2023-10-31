@@ -157,7 +157,10 @@ def generate_images(
         pixel_size = 0.3,
         sigma = 1.0, 
         snr = 1.0,
+        rotation = True,
         add_ctf = False,
+        defocus_min = 0.027,
+        defocus_max = 0.090,
         batch_size = 8,
         device = "cuda",
     ):
@@ -183,8 +186,7 @@ def generate_images(
 
     if type(coord) == np.ndarray:
         coord = torch.from_numpy(coord).type(torch.float64)
-    if device == "cuda":
-        coord = coord.cuda()
+    coord = coord.to(device)
 
     n_struc = coord.shape[0]
     n_atoms = coord.shape[1]
@@ -194,14 +196,16 @@ def generate_images(
     if n_batch * batch_size < N_images:
         n_batch += 1
 
-    quats = gen_quat_torch(N_images, device)
-    rot_mats = quaternion_to_matrix(quats).type(torch.float64)
-    if device == "cuda":
-        rot_mats = rot_mats.cuda()
-    coord_rot = coord.matmul(rot_mats)
+    if rotation:
+        quats = gen_quat_torch(N_images, device)
+        rot_mats = quaternion_to_matrix(quats).type(torch.float64)
+        rot_mats = rot_mats.to(device)
+        coord_rot = coord.matmul(rot_mats)
+    else:
+        rot_mats = torch.eye(3).unsqueeze(0).repeat(N_images,1,1).type(torch.float64)
+        coord_rot = coord
     grid = gen_grid(n_pixel, pixel_size).reshape(-1,1)
-    if device == "cuda":
-        grid = grid.cuda()
+    grid = grid.to(device)
 
     ctfs_cpu = torch.empty((N_images, n_pixel, n_pixel), dtype=torch.complex64, device='cpu')
     images_cpu = torch.empty((N_images, n_pixel, n_pixel), dtype=torch.float64, device='cpu')
@@ -209,7 +213,7 @@ def generate_images(
     if add_ctf:
         amp = 0.1  ## Amplitude constrast ratio 
         b_factor = 1.0  ## B-factor
-        defocus = torch.rand(N_images, dtype=torch.float64, device=device) * (0.090 - 0.027) + 0.027  ## defocus
+        defocus = torch.rand(N_images, dtype=torch.float64, device=device) * (defocus_max - defocus_min) + defocus_min  ## defocus
         
         elecwavel = 0.019866  ## electron wavelength in Angstrom
         gamma = defocus * (np.pi * 2. * 10000 * elecwavel) ## gamma coefficient in SI equation 4 that include the defocus
@@ -218,16 +222,15 @@ def generate_images(
         freq_x, freq_y = torch.meshgrid(freq_pix_1d, freq_pix_1d, indexing='ij')
         freq2_2d = freq_x**2 + freq_y**2  ## square of modulus of spatial frequency
     
-    for i in tqdm(range(n_batch)):
+    for i in tqdm(range(n_batch), desc="Generating images for batch"):
         start = i*batch_size
         end = (i+1)*batch_size
         coords_batch = coord_rot[start:end]
-        if device == "cuda":
-            coords_batch = coords_batch.cuda()
+        coords_batch = coords_batch.to(device)
         if add_ctf:
             ctf_batch = calc_ctf_torch_batch(freq2_2d, amp, gamma[start:end], b_factor)
             ctfs_cpu[start:end] = ctf_batch
-            image_batch = gen_img_torch_batch(coords_batch, grid, sigma, norm, ctf_batch)
+            image_batch = gen_img_torch_batch(coords_batch, grid, sigma, norm, ctf_batch.to(device))
         else:
             image_batch = gen_img_torch_batch(coords_batch, grid, sigma, norm)
         if not np.isinf(snr):
@@ -248,6 +251,7 @@ def calc_struc_image_diff(
         ctfs = None,
         batch_size = 8,
         device = "cuda",
+        return_template = False,
     ):
     ## 
     ## calc_struc_image_diff : function : calculate the difference between an image and a structure, given a set of images and a structure (= a set of N_image coordinates of the structure aligned to each of the images)
@@ -268,9 +272,8 @@ def calc_struc_image_diff(
 
     if type(coord) == np.ndarray:
         coord = torch.from_numpy(coord).type(torch.float64)
-        if device == "cuda":
-            coord = coord.cuda()
 
+    coord = coord.to(device)
     n_atoms = coord.shape[1]
     norm = .5/(np.pi*sigma**2*n_atoms)
     N_images = coord.shape[0]
@@ -279,28 +282,29 @@ def calc_struc_image_diff(
         n_batch += 1
 
     grid = gen_grid(n_pixel, pixel_size).reshape(-1,1)
-    if device == "cuda":
-        grid = grid.cuda()
+    grid = grid.to(device)
 
+    if return_template:
+        image_template = torch.empty(N_images, n_pixel, n_pixel, dtype=torch.float64, device=device)
     diff = torch.empty(N_images, dtype=torch.float64, device='cpu')
-    
     for i in range(n_batch):
         start = i*batch_size
         end = (i+1)*batch_size
         if ctfs is not None:
             ctf_batch = ctfs[start:end]
-            if device == "cuda":
-                ctf_batch = ctf_batch.cuda()
+            ctf_batch = ctf_batch.to(device)
             image_batch = gen_img_torch_batch(coord[start:end], grid, sigma, norm, ctf_batch)
         else:
             image_batch = gen_img_torch_batch(coord[start:end], grid, sigma, norm)
         image_batch = image_batch - image_batch.mean(dim=(1,2)).view(-1,1,1)
-        if device == "cuda":
-            diff[start:end] = torch.sum((image_batch - images[start:end].cuda())**2, dim=(1,2)).cpu()
-        else:
-            diff[start:end] = torch.sum((image_batch - images[start:end])**2, dim=(1,2))
+        diff[start:end] = torch.sum((image_batch - images[start:end].to(device))**2, dim=(1,2))
+        if return_template:
+            image_template[start:end] = image_batch.cpu()
 
-    return diff
+    if return_template:
+        return diff, image_template
+    else:
+        return diff
 
 
 
