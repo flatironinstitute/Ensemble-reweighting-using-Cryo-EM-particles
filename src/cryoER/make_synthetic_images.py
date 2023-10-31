@@ -98,7 +98,6 @@ def _parse_args():
 def make_synthetic_images(
     top_image = "image.gro",
     traj_image = "image.xtc",
-    outdir = "./output/",
     n_pixel = 128,
     pixel_size = 0.2,
     sigma = 1.5,
@@ -108,7 +107,8 @@ def make_synthetic_images(
     defocus_min = 0.027,
     defocus_max = 0.090,
     device = "cpu",
-    batch_size = 16
+    batch_size = 16,
+    outdir = None
 ):
 
     ######## ######## ######## ########
@@ -135,11 +135,12 @@ def make_synthetic_images(
         batch_size=batch_size,
         device=device,
     )
-    print("Saving images to %s..." % outdir)
-    np.save("%s/rot_mats_%s.npy" % (outdir, file_prefix), rot_mats)
-    np.save("%s/ctf_%s.npy" % (outdir, file_prefix), ctfs)
-    np.save("%s/images_%s.npy" % (outdir, file_prefix), images)
-    print("Done!")
+    if outdir is not None:
+        print("Saving images to %s..." % outdir)
+        np.save("%s/rot_mats_%s.npy" % (outdir, file_prefix), rot_mats.cpu().numpy())
+        np.save("%s/ctf_%s.npy" % (outdir, file_prefix), ctfs.cpu().numpy())
+        np.save("%s/images_%s.npy" % (outdir, file_prefix), images.cpu().numpy())
+        print("Done!")
 
     return rot_mats, ctfs, images
 
@@ -164,7 +165,6 @@ if __name__ == "__main__":
     _, _, _ = make_synthetic_images(
         top_image = top_image,
         traj_image = traj_image,
-        outdir = outdir,
         n_pixel = n_pixel,
         pixel_size = pixel_size,
         sigma = sigma,
@@ -173,7 +173,8 @@ if __name__ == "__main__":
         defocus_min = defocus_min,
         defocus_max = defocus_max,
         device = device,
-        batch_size = batch_size
+        batch_size = batch_size,
+        outdir = outdir
     )
     
     pass
