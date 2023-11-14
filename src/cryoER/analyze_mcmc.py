@@ -42,7 +42,7 @@ def analyze_mcmc(
     nm /= np.sum(nm)
     log_nm = np.log(nm)
 
-    log_weights_d = []
+    log_weights_mc_chains = []
     for file in files:
         log_weights_chain = []
         lp_chain = []
@@ -54,12 +54,12 @@ def analyze_mcmc(
                 log_weights_chain.append(log_weights_row)
         log_weights = np.array(log_weights_chain)
         lp_chain = np.array(lp_chain)
-        log_weights_d.append(log_weights)
+        log_weights_mc_chains.append(log_weights)
         lp.append(lp_chain)
 
-    log_weights_d = np.array(log_weights_d)
+    log_weights_mc_chains = np.array(log_weights_mc_chains)
 
-    log_factor = log_weights_d - logsumexp(log_weights_d, axis=2)[:,:,None]
+    log_factor = log_weights_mc_chains - logsumexp(log_weights_mc_chains, axis=2)[:,:,None] # not necessary, but just in case
 
     factor = np.exp(log_factor)         # sampled reweighting factor
     factor_mean = factor.mean((0,1))
@@ -68,7 +68,7 @@ def analyze_mcmc(
     factor_mean_std = np.vstack((factor_mean, factor_std)).T
     np.savetxt(output_directory+"reweighting_factor.txt", factor_mean_std, fmt='%.6f')
 
-    log_rewtprob = log_weights_d + log_nm[None,None,:]
+    log_rewtprob = log_weights_mc_chains + log_nm[None,None,:]
     log_rewtprob -= logsumexp(log_rewtprob, axis=2)[:,:,None]
 
     rewtprob = np.exp(log_rewtprob)     # reweighted probability
@@ -80,6 +80,8 @@ def analyze_mcmc(
 
     lp = np.array(lp)
     np.savetxt(output_directory+"lp.txt", lp, fmt='%.6f')
+
+    return factor_mean_std, rewtprob_mean_std, lp, log_weights_mc_chains
 
 
 if __name__ == "__main__":

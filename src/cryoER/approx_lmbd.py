@@ -143,7 +143,6 @@ def approx_lmbd(top_struc, traj_struc, n_pixel, pixel_size, sigma, signal_to_noi
     noise_std = signal_std / np.sqrt(snr)
 
     lmbd = noise_std.mean().numpy()
-    print(snr, lmbd)
 
     return lmbd
 
