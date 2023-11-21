@@ -104,7 +104,4 @@ src/cryoER/cryo-er.hpp
 data/.*.lock
 data/.*.npz
 
-# output files from tutorial
-tutorial/output/
-
 local_script/
