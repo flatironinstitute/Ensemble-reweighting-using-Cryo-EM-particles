@@ -104,4 +104,6 @@ src/cryoER/cryo-er.hpp
 data/.*.lock
 data/.*.npz
 
+tutorial/output/*.npy
+
 local_script/
