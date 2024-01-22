@@ -107,6 +107,7 @@ def make_synthetic_images(
     defocus_min = 0.027,
     defocus_max = 0.090,
     device = "cpu",
+    n_batch = None,
     batch_size = 16,
     outdir = None
 ):
@@ -122,6 +123,11 @@ def make_synthetic_images(
     coord_img = mdau_to_pos_arr(uImg)
     if n_image_per_struc > 1:
         coord_img = coord_img.repeat(n_image_per_struc, 1, 1)
+
+    if n_batch is not None and batch_size is None:
+        n_frames = coord_img.shape[0]
+        batch_size = n_frames//n_batch
+
     coord_img = coord_img.to(device)
     rot_mats, ctfs, images = igt.generate_images(
         coord_img,
@@ -160,7 +166,7 @@ if __name__ == "__main__":
     defocus_min = args.defocus_min
     defocus_max = args.defocus_max
     device = args.device
-    batch_size = args.batch_size
+    n_batch = args.n_batch
 
     _, _, _ = make_synthetic_images(
         top_image = top_image,
@@ -173,7 +179,7 @@ if __name__ == "__main__":
         defocus_min = defocus_min,
         defocus_max = defocus_max,
         device = device,
-        batch_size = batch_size,
+        n_batch = n_batch,
         outdir = outdir
     )
     
