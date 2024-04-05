@@ -128,9 +128,7 @@ def run_cryoER_mcmc(
 ):
 
     ## Read N_m, the number of conformations that are in the mth cluster
-    infileclustersize = infileclustersize
-    counts = np.loadtxt(infileclustersize).astype(int)
-    counts = counts.astype(float)
+    counts = np.loadtxt(infileclustersize).astype(float)
     counts /= np.sum(counts)
     log_Nm = np.log(counts)
 
