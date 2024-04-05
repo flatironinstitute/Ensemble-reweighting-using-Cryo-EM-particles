@@ -162,7 +162,10 @@ def run_cryoER_mcmc(
     json_filename = "%s/Dmat.json" % (outdir)
     stan_output_file = "%s/Stan_output" % (outdir)
 
-    norm = 0.5 / (lmbd**2)
+    if lmbd == -1:
+        norm = 1
+    else:
+        norm = 0.5 / (lmbd**2)
     Dmat = -norm * distance.T
 
     dictionary = {
