@@ -161,7 +161,7 @@ def run_cryoER_mcmc(
     stan_output_file = "%s/Stan_output" % (outdir)
 
     if lmbd == -1:
-        norm = 1
+        norm = -1
     else:
         norm = 0.5 / (lmbd**2)
     Dmat = -norm * distance.T
