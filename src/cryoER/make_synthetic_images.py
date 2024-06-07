@@ -87,7 +87,14 @@ def _parse_args():
         "--n_batch",
         type=int,
         default=10,
-        help="number of batch to separate the output files into for memory management",
+        help="number of batches to separate the output files into for memory management",
+    )
+    parser.add_argument(
+        "-bs",
+        "--batch_size",
+        type=int,
+        default=10,
+        help="sizes of batches to separate the output files into for memory management",
     )
     return parser
 
@@ -167,6 +174,7 @@ if __name__ == "__main__":
     defocus_max = args.defocus_max
     device = args.device
     n_batch = args.n_batch
+    batch_size = args.batch_size
 
     _, _, _ = make_synthetic_images(
         top_image = top_image,
@@ -180,6 +188,7 @@ if __name__ == "__main__":
         defocus_max = defocus_max,
         device = device,
         n_batch = n_batch,
+        batch_size = batch_size,
         outdir = outdir
     )
     
